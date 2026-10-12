@@ -5,8 +5,9 @@ import { GameSearch } from './GameSearch';
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
 
-  const handleSearch = (id: number) => {
-    navigate(`/player/${id}`);
+  const handleSearch = (id: number, leaderboard?: string) => {
+    const searchParams = leaderboard ? `?leaderboard=${encodeURIComponent(leaderboard)}` : '';
+    navigate(`/player/${id}${searchParams}`);
   };
 
   return (
