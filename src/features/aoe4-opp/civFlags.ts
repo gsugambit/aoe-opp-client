@@ -18,6 +18,39 @@ const CIV_ALIASES: Record<string, string[]> = {
   'zhu-xi-s-legacy': ['zhu_xis_legacy', 'zhu_xi_s_legacy'],
 };
 
+export const formatCivName = (civ?: string): string => {
+  if (!civ) return 'Unknown Civ';
+  return civ
+    .split(/[-_ ]+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
+export const DEFAULT_CIVILIZATIONS = [
+  'abbasid_dynasty',
+  'ayyubids',
+  'byzantines',
+  'chinese',
+  'delhi_sultanate',
+  'english',
+  'french',
+  'golden_horde',
+  'holy_roman_empire',
+  'house_of_lancaster',
+  'japanese',
+  'jeanne_darc',
+  'knights_templar',
+  'macedonian_dynasty',
+  'malians',
+  'mongols',
+  'order_of_the_dragon',
+  'ottomans',
+  'rus',
+  'sengoku_daimyo',
+  'tughlaq_dynasty',
+  'zhu_xis_legacy',
+];
+
 export const getFlagUrl = (civilization: string | undefined): string | undefined => {
   if (!civilization) return undefined;
   const slug = toSlug(civilization);

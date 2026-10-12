@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Leaderboard, useGetGameInfoQuery } from './aoe4OppApi';
 import { GameDisplay } from './GameDisplay';
+import { PlayerComparison } from './PlayerComparison';
+import { getFlagUrl, formatCivName } from './civFlags';
 
 export const PlayerResultsPage: React.FC = () => {
   const { playerId: playerIdParam } = useParams<{ playerId: string }>();
@@ -55,11 +57,135 @@ export const PlayerResultsPage: React.FC = () => {
     skip: playerId === null || isNaN(playerId),
   });
 
+  const currentPlayer = useMemo(() => {
+    if (!games || games.length === 0 || playerId === null) return null;
+    for (const game of games) {
+      const found =
+        game.winningTeam?.players.find((p) => p.profileId === playerId) ??
+        game.losingTeams.flatMap((t) => t.players).find((p) => p.profileId === playerId);
+      if (found) return found;
+    }
+    return null;
+  }, [games, playerId]);
+
+  const gamertag = currentPlayer?.name || '';
+  const civFlagUrl = getFlagUrl(currentPlayer?.civilization);
+
   return (
     <div style={{ width: '100%', margin: '0 auto', textAlign: 'left' }}>
       <button onClick={() => navigate('/')} style={{ marginBottom: '20px' }}>
         ← Back to Search
       </button>
+
+      {/* Player Header - Gamertag and Profile ID */}
+      {playerId !== null && !isNaN(playerId) && (
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '16px',
+            padding: '20px 24px',
+            backgroundColor: '#1e293b',
+            borderRadius: '10px',
+            border: '1px solid #334155',
+            marginBottom: '24px',
+          }}
+        >
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <h1 style={{ margin: 0, fontSize: '1.85rem', color: '#f8fafc', fontWeight: 700 }}>
+                {gamertag ? gamertag : `Player #${playerId}`}
+              </h1>
+              {civFlagUrl && (
+                <img
+                  src={civFlagUrl}
+                  alt={currentPlayer?.civilization || 'Civ'}
+                  title={formatCivName(currentPlayer?.civilization)}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    objectFit: 'cover',
+                    borderRadius: '4px',
+                    border: '1px solid #475569',
+                  }}
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              )}
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                marginTop: '8px',
+                fontSize: '0.95rem',
+                color: '#94a3b8',
+                flexWrap: 'wrap',
+              }}
+            >
+              <span>
+                Profile ID: <strong style={{ color: '#f8fafc' }}>{playerId}</strong>
+              </span>
+              {currentPlayer?.civilization && (
+                <span>
+                  Recent Civ:{' '}
+                  <strong style={{ color: '#38bdf8' }}>
+                    {formatCivName(currentPlayer.civilization)}
+                  </strong>
+                </span>
+              )}
+              {currentPlayer?.rating !== undefined && currentPlayer.rating > 0 && (
+                <span>
+                  Rating: <strong style={{ color: '#34d399' }}>{currentPlayer.rating}</strong>
+                </span>
+              )}
+              {currentPlayer?.mmr !== undefined && currentPlayer.mmr > 0 && (
+                <span>
+                  MMR: <strong style={{ color: '#a78bfa' }}>{currentPlayer.mmr}</strong>
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <a
+              href={`https://aoe4world.com/players/${playerId}${gamertag ? `-${encodeURIComponent(gamertag)}` : ''}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                fontSize: '0.85rem',
+                color: '#94a3b8',
+                textDecoration: 'none',
+                padding: '8px 14px',
+                borderRadius: '6px',
+                backgroundColor: '#0f172a',
+                border: '1px solid #334155',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'background-color 0.2s',
+              }}
+            >
+              aoe4world.com ↗
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Compare Players Section */}
+      {playerId !== null && !isNaN(playerId) && (
+        <PlayerComparison
+          key={playerId}
+          currentPlayerId={playerId}
+          currentGamerName={gamertag}
+          currentCivilization={currentPlayer?.civilization}
+          defaultLeaderboard={leaderboard || Leaderboard.RM_SOLO}
+        />
+      )}
 
       <h2>Game Results</h2>
 
@@ -190,6 +316,7 @@ export const PlayerResultsPage: React.FC = () => {
 
       {games && playerId !== null && !isNaN(playerId) && (
         <GameDisplay
+          key={playerId}
           games={games}
           playerId={playerId}
           page={page}

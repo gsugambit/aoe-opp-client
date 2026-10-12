@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
-  useGetTimelineMetricsQuery,
+  useGetGameAnalysisQuery,
   useAnalyzeMatchupMutation,
   getAoe4WorldGameUrl,
-  type PlayerTimeline,
+  type PlayerGameAnalysis,
+  type PlayerMatchupResult,
   type MatchupAnalysisRequest,
   type MatchupAnalysisResponse,
 } from './aoe4OppApi';
@@ -26,7 +27,7 @@ interface ToastNotification {
   type: 'success' | 'error';
 }
 
-const getPlayerKey = (player: PlayerTimeline, idx: number): string =>
+const getPlayerKey = (player: PlayerGameAnalysis, idx: number): string =>
   player.profileId || player.name || String(idx);
 
 export const GameOverviewPage: React.FC = () => {
@@ -50,21 +51,21 @@ export const GameOverviewPage: React.FC = () => {
   };
 
   const {
-    data: timelineMetrics,
+    data: gameAnalysis,
     error,
     isLoading,
     isFetching,
     refetch,
-  } = useGetTimelineMetricsQuery(gameId || '', {
+  } = useGetGameAnalysisQuery(gameId || '', {
     skip: !gameId,
   });
 
   const [hiddenPlayerKeys, setHiddenPlayerKeys] = useState<Set<string>>(new Set());
 
   const players = useMemo(() => {
-    const list = timelineMetrics?.players ?? [];
+    const list = gameAnalysis?.players ?? [];
     return [...list].sort((a, b) => {
-      const getRank = (res?: string) => {
+      const getRank = (res?: string | null) => {
         if (!res) return 2;
         const lower = res.trim().toLowerCase();
         if (lower === 'win' || lower === 'won' || lower === 'victory') return 0;
@@ -73,23 +74,23 @@ export const GameOverviewPage: React.FC = () => {
       };
       return getRank(a.result) - getRank(b.result);
     });
-  }, [timelineMetrics?.players]);
+  }, [gameAnalysis?.players]);
 
-  const durationSeconds = timelineMetrics?.durationSeconds ?? 0;
-  const mapName = timelineMetrics?.mapName;
-  const leaderboard = timelineMetrics?.leaderboard || searchParams.get('leaderboard') || '';
-  const currentGameId = timelineMetrics?.gameId || gameId || '';
+  const durationSeconds = gameAnalysis?.durationSeconds ?? 0;
+  const mapName = gameAnalysis?.mapName;
+  const leaderboard = gameAnalysis?.leaderboard || searchParams.get('leaderboard') || '';
+  const currentGameId = gameAnalysis?.gameId || gameId || '';
   const aoe4WorldUrl = getAoe4WorldGameUrl(currentGameId, players[0]);
 
   const handleAnalyzePlayers = async () => {
     if (players.length === 0 || isAnalyzing) return;
 
-    const currentLeaderboard = timelineMetrics?.leaderboard || searchParams.get('leaderboard') || 'rm_solo';
+    const currentLeaderboard = gameAnalysis?.leaderboard || searchParams.get('leaderboard') || 'rm_solo';
     const requestPayload: MatchupAnalysisRequest = {
       players: players.map((p) => ({
-        profileId: String(p.profileId),
-        gamerName: p.name,
-        civilization: p.civilization,
+        profileId: String(p.profileId || ''),
+        gamerName: p.name || '',
+        civilization: p.civilization || '',
         leaderboard: currentLeaderboard,
       })),
     };
@@ -97,12 +98,32 @@ export const GameOverviewPage: React.FC = () => {
     try {
       const response = await analyzeMatchup(requestPayload).unwrap();
       setAnalysisData(response);
-      showToast('playher analysis completed', 'success');
+      showToast('Player analysis completed', 'success');
     } catch (err: unknown) {
       console.error('Matchup analysis error:', err);
       showToast('Failed to complete player analysis', 'error');
     }
   };
+
+  const gamePlayerAnalysisResults: PlayerMatchupResult[] = useMemo(() => {
+    if (!gameAnalysis?.players || gameAnalysis.players.length === 0) return [];
+    return gameAnalysis.players.map((p) => ({
+      profileId: p.profileId || '',
+      gamerName: p.name || '',
+      civilization: p.civilization || '',
+      gameIds: [gameAnalysis.gameId || gameId || ''],
+      summary: {
+        averageApm: p.apm,
+        ageUpTimings: p.ageUpTimings,
+        villagerProduction: p.villagerProduction,
+        traderProduction: p.traderProduction,
+        militaryProduction: p.militaryProduction,
+        additionalTownCenters: p.additionalTownCenters,
+        landmarks: p.landmarks,
+        gamesAnalyzed: 1,
+      },
+    }));
+  }, [gameAnalysis, gameId]);
 
   const playerColorMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -131,6 +152,8 @@ export const GameOverviewPage: React.FC = () => {
   const handleShowAll = () => {
     setHiddenPlayerKeys(new Set());
   };
+
+  const hasTimelineData = players.some((p) => p.dataPoints && p.dataPoints.length > 0);
 
   return (
     <div style={{ width: '100%', margin: '0 auto', textAlign: 'left' }}>
@@ -275,7 +298,7 @@ export const GameOverviewPage: React.FC = () => {
             }}
           />
           <span style={{ fontSize: '1.1em', fontWeight: '500', color: '#e2e8f0' }}>
-            Loading game timeline metrics...
+            Loading game analysis...
           </span>
           <style>{`
             @keyframes spin {
@@ -298,7 +321,7 @@ export const GameOverviewPage: React.FC = () => {
             color: '#fca5a5',
           }}
         >
-          <div style={{ fontWeight: 600, marginBottom: '4px' }}>Failed to load timeline metrics</div>
+          <div style={{ fontWeight: 600, marginBottom: '4px' }}>Failed to load game analysis</div>
           <div style={{ fontSize: '0.9em' }}>
             {'status' in error
               ? `API Error (Status ${error.status})`
@@ -310,7 +333,7 @@ export const GameOverviewPage: React.FC = () => {
       )}
 
       {/* Main Content */}
-      {timelineMetrics && (
+      {gameAnalysis && (
         <>
           {/* Match Info Summary Card */}
           <div
@@ -352,7 +375,7 @@ export const GameOverviewPage: React.FC = () => {
                   onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
                   title="View on aoe4world.com"
                 >
-                  {timelineMetrics.gameId || gameId} ↗
+                  {gameAnalysis.gameId || gameId} ↗
                 </a>
               </div>
             </div>
@@ -426,7 +449,7 @@ export const GameOverviewPage: React.FC = () => {
                 const color = DEFAULT_PLAYER_COLORS[idx % DEFAULT_PLAYER_COLORS.length];
                 const playerKey = getPlayerKey(player, idx);
                 const isHidden = hiddenPlayerKeys.has(playerKey);
-                const flagUrl = getFlagUrl(player.civilization);
+                const flagUrl = getFlagUrl(player.civilization ?? undefined);
                 const isWin = player.result?.toLowerCase() === 'win';
                 const isLoss = player.result?.toLowerCase() === 'loss';
 
@@ -454,7 +477,7 @@ export const GameOverviewPage: React.FC = () => {
                       <img
                         src={flagUrl}
                         alt={player.civilization || 'Civ'}
-                        title={player.civilization}
+                        title={player.civilization ?? undefined}
                         style={{
                           width: '22px',
                           height: '22px',
@@ -572,37 +595,48 @@ export const GameOverviewPage: React.FC = () => {
             </div>
           )}
 
-          {/* Player Matchup Analysis Section */}
-          {activeAnalysis?.results && activeAnalysis.results.length > 0 && (
+          {/* Match Historical Analysis or Game Strategic Analysis */}
+          {activeAnalysis?.results && activeAnalysis.results.length > 0 ? (
             <PlayerAnalysisDisplay
               results={activeAnalysis.results}
               playerColors={playerColorMap}
+              title="Historical Matchup Analysis"
+              subtitle="Aggregated strategic metrics across analyzed player matches"
               onClose={() => setAnalysisData(null)}
             />
+          ) : gamePlayerAnalysisResults.length > 0 ? (
+            <PlayerAnalysisDisplay
+              results={gamePlayerAnalysisResults}
+              playerColors={playerColorMap}
+              title="Game Strategic Analysis"
+              subtitle="In-depth analysis of age-up timings, villager/military production, town centers, and landmarks for this match"
+            />
+          ) : null}
+
+          {/* Timeline Charts: 1. Villagers, 2. Military in Responsive Grid (if timeline data points exist) */}
+          {hasTimelineData && (
+            <div className="charts-grid">
+              <TimelineChart
+                title="Villagers Over Time"
+                metricKey="villagerCount"
+                players={players}
+                durationSeconds={durationSeconds}
+                playerColors={DEFAULT_PLAYER_COLORS}
+                hiddenPlayerKeys={hiddenPlayerKeys}
+                onTogglePlayer={handleTogglePlayer}
+              />
+
+              <TimelineChart
+                title="Military Count Over Time"
+                metricKey="militaryCount"
+                players={players}
+                durationSeconds={durationSeconds}
+                playerColors={DEFAULT_PLAYER_COLORS}
+                hiddenPlayerKeys={hiddenPlayerKeys}
+                onTogglePlayer={handleTogglePlayer}
+              />
+            </div>
           )}
-
-          {/* Timeline Charts: 1. Villagers, 2. Military in Responsive Grid */}
-          <div className="charts-grid">
-            <TimelineChart
-              title="Villagers Over Time"
-              metricKey="villagerCount"
-              players={players}
-              durationSeconds={durationSeconds}
-              playerColors={DEFAULT_PLAYER_COLORS}
-              hiddenPlayerKeys={hiddenPlayerKeys}
-              onTogglePlayer={handleTogglePlayer}
-            />
-
-            <TimelineChart
-              title="Military Count Over Time"
-              metricKey="militaryCount"
-              players={players}
-              durationSeconds={durationSeconds}
-              playerColors={DEFAULT_PLAYER_COLORS}
-              hiddenPlayerKeys={hiddenPlayerKeys}
-              onTogglePlayer={handleTogglePlayer}
-            />
-          </div>
         </>
       )}
 

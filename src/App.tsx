@@ -4,7 +4,7 @@ import './App.css'
 import { DashboardPage } from './features/aoe4-opp/DashboardPage'
 import { PlayerResultsPage } from './features/aoe4-opp/PlayerResultsPage'
 import { GameOverviewPage } from './features/aoe4-opp/GameOverviewPage'
-import { useGetTimelineMetricsQuery, getAoe4WorldGameUrl } from './features/aoe4-opp/aoe4OppApi'
+import { useGetGameAnalysisQuery, getAoe4WorldGameUrl } from './features/aoe4-opp/aoe4OppApi'
 
 function AppHeader() {
   const matchGame = useMatch('/game/:gameId');
@@ -15,13 +15,13 @@ function AppHeader() {
   const gameId = gameMatch?.params.gameId;
   const playerId = playerMatch?.params.playerId;
 
-  const { data: timelineMetrics } = useGetTimelineMetricsQuery(gameId || '', {
+  const { data: gameAnalysis } = useGetGameAnalysisQuery(gameId || '', {
     skip: !gameId,
   });
 
   const aoe4worldUrl = (() => {
     if (gameId) {
-      const player = timelineMetrics?.players?.[0];
+      const player = gameAnalysis?.players?.[0];
       return getAoe4WorldGameUrl(gameId, player);
     }
     if (playerId) {
