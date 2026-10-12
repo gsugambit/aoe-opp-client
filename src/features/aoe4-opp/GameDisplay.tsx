@@ -481,7 +481,7 @@ export const GameDisplay: React.FC<GameDisplayProps> = ({
                       e.currentTarget.style.backgroundColor = 'transparent';
                     }
                   }}
-                  title="Click to view Game Overview & Timeline Metrics"
+                  title="Click to view Game Overview & Analysis"
                 >
                   <td style={{ padding: '12px 8px', fontSize: '0.85em', color: '#ccc' }}>
                     <div>{new Date(game.startedAt).toLocaleDateString()}</div>

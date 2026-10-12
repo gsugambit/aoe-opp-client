@@ -10,6 +10,8 @@ import { getFlagUrl } from './civFlags';
 interface PlayerAnalysisDisplayProps {
   results: PlayerMatchupResult[];
   playerColors?: Record<string, string>;
+  title?: string;
+  subtitle?: string;
   onClose?: () => void;
 }
 
@@ -49,6 +51,8 @@ const getTargetAgeLabel = (age?: number | null): string => {
 export const PlayerAnalysisDisplay: React.FC<PlayerAnalysisDisplayProps> = ({
   results,
   playerColors = {},
+  title = 'Historical Matchup Analysis',
+  subtitle = 'Aggregated strategic metrics across analyzed player matches',
   onClose,
 }) => {
   const [selectedPlayerKey, setSelectedPlayerKey] = useState<string>('all');
@@ -109,11 +113,13 @@ export const PlayerAnalysisDisplay: React.FC<PlayerAnalysisDisplayProps> = ({
           </div>
           <div>
             <h3 style={{ margin: 0, fontSize: '1.25em', fontWeight: 600, color: '#f8fafc' }}>
-              Historical Matchup Analysis
+              {title}
             </h3>
-            <div style={{ fontSize: '0.85em', color: '#94a3b8' }}>
-              Aggregated strategic metrics across analyzed player matches
-            </div>
+            {subtitle && (
+              <div style={{ fontSize: '0.85em', color: '#94a3b8' }}>
+                {subtitle}
+              </div>
+            )}
           </div>
         </div>
 
@@ -808,6 +814,8 @@ const MilitarySection: React.FC<{
     return (a.unitType || '').localeCompare(b.unitType || '');
   });
 
+  const totalAvgMilitary = units.reduce((acc, unit) => acc + (unit.averageCount ?? 0), 0);
+
   return (
     <div
       style={{
@@ -819,18 +827,35 @@ const MilitarySection: React.FC<{
     >
       <div
         style={{
-          fontSize: '0.8em',
-          fontWeight: 600,
-          color: '#cbd5e1',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-          marginBottom: '10px',
           display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
+          marginBottom: '10px',
+          flexWrap: 'wrap',
           gap: '6px',
         }}
       >
-        <span>⚔️</span> Military Unit Composition
+        <div
+          style={{
+            fontSize: '0.8em',
+            fontWeight: 600,
+            color: '#cbd5e1',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}
+        >
+          <span>⚔️</span> Military Unit Composition
+        </div>
+        {units.length > 0 && (
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.8em', color: '#22c55e', fontWeight: 600 }}>
+              Avg Military: {totalAvgMilitary.toFixed(1)}
+            </span>
+          </div>
+        )}
       </div>
 
       {units.length === 0 ? (

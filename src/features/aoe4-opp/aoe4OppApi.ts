@@ -90,21 +90,28 @@ export interface TimelineDataPoint {
   totalPopulation: number;
 }
 
-export interface PlayerTimeline {
-  profileId: string;
-  name: string;
-  civilization: string;
-  result: string;
+
+export interface PlayerGameAnalysis {
+  profileId?: string | null;
+  name?: string | null;
+  civilization?: string | null;
+  result?: string | null;
   apm?: number | null;
-  dataPoints: TimelineDataPoint[];
+  ageUpTimings?: AgeUpSummary | null;
+  villagerProduction?: VillagerSummary | null;
+  traderProduction?: TraderSummary | null;
+  militaryProduction?: MilitaryUnitSummary[] | null;
+  additionalTownCenters?: TownCenterSummary | null;
+  landmarks?: LandmarkSummary[] | null;
+  dataPoints?: TimelineDataPoint[];
 }
 
-export interface TimelineMetrics {
+export interface GameAnalysisResponse {
   gameId: string;
   leaderboard?: string | null;
   mapName?: string | null;
   durationSeconds: number;
-  players: PlayerTimeline[];
+  players: PlayerGameAnalysis[];
 }
 
 export interface AgeUpSummary {
@@ -204,6 +211,11 @@ export const getAoe4WorldGameUrl = (
   return `https://aoe4world.com/games/${gameId}`;
 };
 
+export interface CivilizationOption {
+  value: string;
+  displayName: string;
+}
+
 export const aoe4OppApi = createApi({
   reducerPath: 'aoe4OppApi',
   baseQuery: fetchBaseQuery({ baseUrl: '/api/v1/aoe4-opp' }),
@@ -280,8 +292,8 @@ export const aoe4OppApi = createApi({
     getGameSummary: builder.query<unknown, number | string>({
       query: (gameId) => `/game-summary/${gameId}`,
     }),
-    getTimelineMetrics: builder.query<TimelineMetrics, number | string>({
-      query: (gameId) => `/game-summary/${gameId}/timeline`,
+    getGameAnalysis: builder.query<GameAnalysisResponse, number | string>({
+      query: (gameId) => `/game-summary/${gameId}/analysis`,
     }),
     analyzeMatchup: builder.mutation<MatchupAnalysisResponse, MatchupAnalysisRequest>({
       query: (body) => ({
@@ -289,6 +301,50 @@ export const aoe4OppApi = createApi({
         method: 'POST',
         body,
       }),
+    }),
+    getCivilizations: builder.query<CivilizationOption[], void>({
+      query: () => '/civilizations',
+      transformResponse: (response: unknown): CivilizationOption[] => {
+        const formatFallback = (val: string): string => {
+          return val
+            .split(/[-_ ]+/)
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+        };
+
+        const parseItem = (item: unknown): CivilizationOption | null => {
+          if (typeof item === 'string') {
+            const trimmed = item.trim();
+            if (!trimmed) return null;
+            return {
+              value: trimmed,
+              displayName: formatFallback(trimmed),
+            };
+          }
+          if (item && typeof item === 'object') {
+            const obj = item as Record<string, unknown>;
+            const val = String(obj.value ?? obj.name ?? obj.id ?? obj.slug ?? '').trim();
+            if (!val) return null;
+            const display = String(obj.displayName ?? obj.name ?? (val ? formatFallback(val) : '')).trim();
+            return {
+              value: val,
+              displayName: display || formatFallback(val),
+            };
+          }
+          return null;
+        };
+
+        if (Array.isArray(response)) {
+          return response.map(parseItem).filter((c): c is CivilizationOption => c !== null);
+        }
+        if (response && typeof response === 'object' && 'civilizations' in response) {
+          const civList = (response as { civilizations: unknown[] }).civilizations;
+          if (Array.isArray(civList)) {
+            return civList.map(parseItem).filter((c): c is CivilizationOption => c !== null);
+          }
+        }
+        return [];
+      },
     }),
   }),
 });
@@ -300,7 +356,9 @@ export const {
   useLazyScrapeGameSummaryQuery,
   useGetGameSummaryQuery,
   useLazyGetGameSummaryQuery,
-  useGetTimelineMetricsQuery,
-  useLazyGetTimelineMetricsQuery,
+  useGetGameAnalysisQuery,
+  useLazyGetGameAnalysisQuery,
   useAnalyzeMatchupMutation,
+  useGetCivilizationsQuery,
+  useLazyGetCivilizationsQuery,
 } = aoe4OppApi;

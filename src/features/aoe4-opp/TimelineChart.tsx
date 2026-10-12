@@ -1,11 +1,11 @@
 import React, { useState, useRef, useId } from 'react';
-import type { PlayerTimeline, TimelineDataPoint } from './aoe4OppApi';
+import type { PlayerGameAnalysis, TimelineDataPoint } from './aoe4OppApi';
 import { DEFAULT_PLAYER_COLORS } from './timelineConstants';
 
 interface TimelineChartProps {
   title: string;
   metricKey: 'villagerCount' | 'militaryCount';
-  players: PlayerTimeline[];
+  players: PlayerGameAnalysis[];
   playerColors?: string[];
   durationSeconds?: number;
   hiddenPlayerKeys?: Set<string>;
@@ -34,7 +34,7 @@ export const TimelineChart: React.FC<TimelineChartProps> = ({
 
   const effectiveHiddenKeys = hiddenPlayerKeys ?? internalHiddenKeys;
 
-  const getPlayerKey = (player: PlayerTimeline, idx: number): string =>
+  const getPlayerKey = (player: PlayerGameAnalysis, idx: number): string =>
     player.profileId || player.name || String(idx);
 
   const handleToggle = (playerKey: string) => {
@@ -70,7 +70,7 @@ export const TimelineChart: React.FC<TimelineChartProps> = ({
   const plotHeight = viewBoxHeight - padding.top - padding.bottom;
 
   // Calculate max timestamp and max value
-  const allTimestamps = players.flatMap((p) => p.dataPoints.map((d) => d.timestamp));
+  const allTimestamps = players.flatMap((p) => (p.dataPoints || []).map((d) => d.timestamp));
   const maxTimestampRaw = Math.max(durationSeconds, ...allTimestamps, 60);
   // Round up maxTimestamp to next clean 60s
   const maxTime = Math.ceil(maxTimestampRaw / 60) * 60;
@@ -80,7 +80,7 @@ export const TimelineChart: React.FC<TimelineChartProps> = ({
     visiblePlayersWithIndices.length > 0
       ? visiblePlayersWithIndices.map((i) => i.player)
       : players;
-  const allValues = targetPlayersForY.flatMap((p) => p.dataPoints.map((d) => d[metricKey] ?? 0));
+  const allValues = targetPlayersForY.flatMap((p) => (p.dataPoints || []).map((d) => d[metricKey] ?? 0));
   const rawMaxValue = Math.max(10, ...allValues);
   // Pick nice Y axis max
   const getNiceYMax = (max: number) => {
@@ -130,7 +130,7 @@ export const TimelineChart: React.FC<TimelineChartProps> = ({
   const hoveredTime =
     hoverX !== null ? Math.round(((hoverX - padding.left) / plotWidth) * maxTime) : null;
 
-  const getPlayerValueAtTime = (player: PlayerTimeline, time: number): number => {
+  const getPlayerValueAtTime = (player: PlayerGameAnalysis, time: number): number => {
     const points = player.dataPoints;
     if (!points || points.length === 0) return 0;
     // Points are typically chronological
@@ -341,7 +341,8 @@ export const TimelineChart: React.FC<TimelineChartProps> = ({
             {/* Player Lines (No area fill, clean stroke lines) */}
             <g clipPath={`url(#plot-area-${chartId})`}>
               {visiblePlayersWithIndices.map(({ player, originalIndex, color }) => {
-                const sortedPoints = [...player.dataPoints].sort(
+                const points = player.dataPoints || [];
+                const sortedPoints = [...points].sort(
                   (a: TimelineDataPoint, b: TimelineDataPoint) => a.timestamp - b.timestamp
                 );
 
