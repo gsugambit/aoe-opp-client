@@ -1,20 +1,31 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchPlayersQuery } from './aoe4OppApi';
+import { Leaderboard, useSearchPlayersQuery } from './aoe4OppApi';
 
 interface GameSearchProps {
-  onSearch: (playerId: number) => void;
+  onSearch: (playerId: number, leaderboard?: string) => void;
   isFetching?: boolean;
   initialValue?: string;
+  initialLeaderboard?: string;
 }
 
-export const GameSearch: React.FC<GameSearchProps> = ({ onSearch, initialValue = '' }) => {
+export const GameSearch: React.FC<GameSearchProps> = ({
+  onSearch,
+  initialValue = '',
+  initialLeaderboard = Leaderboard.RM_SOLO,
+}) => {
   const [searchTerm, setSearchTerm] = useState<string>(initialValue);
-  const [leaderboard, setLeaderboard] = useState<string>('1V1');
+  const [leaderboard, setLeaderboard] = useState<string>(initialLeaderboard);
   const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
     setSearchTerm(initialValue);
   }, [initialValue]);
+
+  useEffect(() => {
+    if (initialLeaderboard) {
+      setLeaderboard(initialLeaderboard);
+    }
+  }, [initialLeaderboard]);
 
   // Debounce search term
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
@@ -34,25 +45,28 @@ export const GameSearch: React.FC<GameSearchProps> = ({ onSearch, initialValue =
     e.preventDefault();
     const id = parseInt(searchTerm, 10);
     if (!isNaN(id)) {
-      onSearch(id);
+      onSearch(id, leaderboard);
     }
   };
 
   const handleSelectPlayer = (profileId: number) => {
-    onSearch(profileId);
+    onSearch(profileId, leaderboard);
     setShowDropdown(false);
   };
 
   return (
-    <div style={{ position: 'relative', width: '300px', marginBottom: '20px' }}>
+    <div style={{ position: 'relative', width: '360px', marginBottom: '20px' }}>
       <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '8px' }}>
         <select
           value={leaderboard}
           onChange={(e) => setLeaderboard(e.target.value)}
           style={{ padding: '8px' }}
         >
-          <option value="1V1">1V1</option>
-          <option value="2V2">2V2</option>
+          {Object.values(Leaderboard).map((lb) => (
+            <option key={lb} value={lb}>
+              {lb}
+            </option>
+          ))}
         </select>
         <input
           type="text"
@@ -70,7 +84,7 @@ export const GameSearch: React.FC<GameSearchProps> = ({ onSearch, initialValue =
         </button>
       </form>
 
-      {showDropdown && data && data.players.length > 0 && (
+      {showDropdown && data && data.players && data.players.length > 0 && (
         <ul style={{
           position: 'absolute',
           top: '100%',

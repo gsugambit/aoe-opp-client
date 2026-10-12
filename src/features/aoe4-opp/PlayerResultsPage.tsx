@@ -1,45 +1,177 @@
 import React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useGetGameInfoQuery } from './aoe4OppApi';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Leaderboard, useGetGameInfoQuery } from './aoe4OppApi';
 import { GameDisplay } from './GameDisplay';
 
 export const PlayerResultsPage: React.FC = () => {
   const { playerId: playerIdParam } = useParams<{ playerId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const playerId = playerIdParam ? parseInt(playerIdParam, 10) : null;
 
-  const { data: games, error, isFetching } = useGetGameInfoQuery(playerId!, {
+  const leaderboardParam = searchParams.get('leaderboard') || '';
+  const pageParam = parseInt(searchParams.get('page') || '1', 10);
+  const perPageParam = parseInt(
+    searchParams.get('per_page') || searchParams.get('pageSize') || '10',
+    10
+  );
+
+  const leaderboard = leaderboardParam;
+  const page = isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
+  const perPage = isNaN(perPageParam) || perPageParam < 1 ? 10 : perPageParam;
+
+  const updateUrlParams = (newPage: number, newPerPage: number, newLb: string) => {
+    const params = new URLSearchParams();
+    if (newLb) params.set('leaderboard', newLb);
+    if (newPage > 1) params.set('page', newPage.toString());
+    if (newPerPage !== 10) params.set('per_page', newPerPage.toString());
+    setSearchParams(params);
+  };
+
+  const handleLeaderboardChange = (newLb: string) => {
+    updateUrlParams(1, perPage, newLb);
+  };
+
+  const handlePerPageChange = (newPerPage: number) => {
+    updateUrlParams(1, newPerPage, leaderboard);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1) return;
+    updateUrlParams(newPage, perPage, leaderboard);
+  };
+
+  const queryParams =
+    playerId !== null && !isNaN(playerId)
+      ? {
+          playerId,
+          page,
+          perPage,
+          ...(leaderboard ? { leaderboard } : {}),
+        }
+      : { playerId: 0 };
+
+  const { data: games, error, isFetching } = useGetGameInfoQuery(queryParams, {
     skip: playerId === null || isNaN(playerId),
   });
 
   return (
-    <div style={{ padding: '20px' }}>
+    <div style={{ width: '100%', margin: '0 auto', textAlign: 'left' }}>
       <button onClick={() => navigate('/')} style={{ marginBottom: '20px' }}>
         ← Back to Search
       </button>
-      
+
       <h2>Game Results</h2>
-      
-      {isFetching && (
-        <div style={{
-          padding: '20px',
-          backgroundColor: '#2c3e50',
-          borderRadius: '8px',
-          marginBottom: '20px',
+
+      {/* Filter and Pagination Controls */}
+      <div
+        style={{
           display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
+          flexWrap: 'wrap',
           gap: '15px',
-          border: '1px solid #34495e'
-        }}>
-          <div className="loading-spinner" style={{
-            width: '24px',
-            height: '24px',
-            border: '3px solid rgba(255,255,255,.3)',
-            borderTop: '3px solid #fff',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite'
-          }} />
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '20px',
+          padding: '12px 16px',
+          backgroundColor: '#242424',
+          borderRadius: '8px',
+          border: '1px solid #444',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <label htmlFor="leaderboard-select" style={{ fontWeight: '500' }}>
+            Leaderboard:
+          </label>
+          <select
+            id="leaderboard-select"
+            value={leaderboard}
+            onChange={(e) => handleLeaderboardChange(e.target.value)}
+            style={{
+              padding: '6px 10px',
+              borderRadius: '4px',
+              backgroundColor: '#333',
+              color: '#fff',
+              border: '1px solid #555',
+            }}
+          >
+            <option value="">Default (All)</option>
+            {Object.values(Leaderboard).map((lb) => (
+              <option key={lb} value={lb}>
+                {lb}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <label htmlFor="per-page-select" style={{ fontWeight: '500' }}>
+            Per Page:
+          </label>
+          <select
+            id="per-page-select"
+            value={perPage}
+            onChange={(e) => handlePerPageChange(parseInt(e.target.value, 10))}
+            style={{
+              padding: '6px 10px',
+              borderRadius: '4px',
+              backgroundColor: '#333',
+              color: '#fff',
+              border: '1px solid #555',
+            }}
+          >
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={() => handlePageChange(page - 1)}
+            disabled={page <= 1 || isFetching}
+            style={{ padding: '6px 12px' }}
+          >
+            Previous
+          </button>
+          <span style={{ fontWeight: '500', minWidth: '60px', textAlign: 'center' }}>
+            Page {page}
+          </span>
+          <button
+            onClick={() => handlePageChange(page + 1)}
+            disabled={isFetching || (games && games.length < perPage)}
+            style={{ padding: '6px 12px' }}
+          >
+            Next
+          </button>
+        </div>
+      </div>
+
+      {isFetching && (
+        <div
+          style={{
+            padding: '20px',
+            backgroundColor: '#2c3e50',
+            borderRadius: '8px',
+            marginBottom: '20px',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '15px',
+            border: '1px solid #34495e',
+          }}
+        >
+          <div
+            className="loading-spinner"
+            style={{
+              width: '24px',
+              height: '24px',
+              border: '3px solid rgba(255,255,255,.3)',
+              borderTop: '3px solid #fff',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+            }}
+          />
           <span style={{ fontSize: '1.2em', fontWeight: '500' }}>Fetching match history...</span>
           <style>{`
             @keyframes spin {
@@ -49,15 +181,20 @@ export const PlayerResultsPage: React.FC = () => {
           `}</style>
         </div>
       )}
-      
+
       {error && (
         <p style={{ color: 'red' }}>
-          Error: {('status' in error) ? `Status ${error.status}` : 'Unknown error'}
+          Error: {'status' in error ? `Status ${error.status}` : 'Unknown error'}
         </p>
       )}
 
       {games && playerId !== null && !isNaN(playerId) && (
-        <GameDisplay games={games} playerId={playerId} />
+        <GameDisplay
+          games={games}
+          playerId={playerId}
+          page={page}
+          leaderboard={leaderboard}
+        />
       )}
     </div>
   );
